@@ -10,6 +10,15 @@
     This avoids cloning block data that is already uncompressed, i.e.,
     `CompressionMethod::None`.
 
+### Fixed
+
+  * cram/io/reader/container/slice: Fix copying reference sequences ([#376]).
+
+    Reference sequences were unintentionally being copied, which could lead to
+    memory exhaustion.
+
+[#376]: https://github.com/zaeleus/noodles/pull/376
+
 ## 0.89.0 - 2026-02-18
 
 ### Changed
