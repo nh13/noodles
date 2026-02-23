@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     io::{self, Write},
-    str,
 };
 
 use super::Type;
@@ -16,11 +15,7 @@ pub fn encode(mut src: &[u8]) -> io::Result<Vec<u8>> {
         src = buf;
     }
 
-    let names: Vec<_> = src
-        .split(|&b| b == NUL)
-        .map(str::from_utf8)
-        .collect::<Result<_, _>>()
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?;
+    let names: Vec<_> = src.split(|&b| b == NUL).collect();
 
     write_header(&mut dst, src.len(), names.len())?;
 
@@ -93,7 +88,7 @@ where
 
 #[derive(Debug)]
 enum Token {
-    String(String),
+    String(Vec<u8>),
     Char(u8),
     PaddedDigits(u32, usize),
     // ...
@@ -133,7 +128,7 @@ enum Mode {
 
 struct Diff {
     mode: Mode,
-    raw_tokens: Vec<String>,
+    raw_tokens: Vec<Vec<u8>>,
     tokens: Vec<Token>,
 }
 
@@ -158,25 +153,24 @@ impl Diff {
     }
 }
 
-fn tokenize(s: &str) -> impl Iterator<Item = &str> {
+fn tokenize(b: &[u8]) -> impl Iterator<Item = &[u8]> {
     use std::iter;
 
-    let b = s.as_bytes();
     let mut start = 0;
     let mut end = 0;
 
     iter::from_fn(move || {
-        while end < s.len() && b[end].is_ascii_alphanumeric() {
+        while end < b.len() && b[end].is_ascii_alphanumeric() {
             end += 1;
         }
 
         if start != end {
             let beg = start;
             start = end;
-            return Some(&s[beg..end]);
+            return Some(&b[beg..end]);
         }
 
-        while end < s.len() && !b[end].is_ascii_alphanumeric() {
+        while end < b.len() && !b[end].is_ascii_alphanumeric() {
             end += 1;
         }
 
@@ -185,12 +179,12 @@ fn tokenize(s: &str) -> impl Iterator<Item = &str> {
         } else {
             let beg = start;
             start = end;
-            Some(&s[beg..end])
+            Some(&b[beg..end])
         }
     })
 }
 
-fn build_first_diff(name: &str) -> Diff {
+fn build_first_diff(name: &[u8]) -> Diff {
     let mut diff = Diff::new(Mode::Diff(0));
 
     let raw_tokens = tokenize(name);
@@ -201,8 +195,7 @@ fn build_first_diff(name: &str) -> Diff {
         } else if let Some(n) = parse_digits(raw_token) {
             Token::Digits(n)
         } else if raw_token.len() == 1 {
-            let b = raw_token.as_bytes()[0];
-            Token::Char(b)
+            Token::Char(raw_token[0])
         } else {
             Token::String(raw_token.into())
         };
@@ -216,7 +209,12 @@ fn build_first_diff(name: &str) -> Diff {
     diff
 }
 
-fn build_diff(diffs: &[Diff], names_indices: &HashMap<&str, usize>, i: usize, name: &str) -> Diff {
+fn build_diff(
+    diffs: &[Diff],
+    names_indices: &HashMap<&[u8], usize>,
+    i: usize,
+    name: &[u8],
+) -> Diff {
     let mut diff = if let Some(j) = names_indices.get(name) {
         let delta = i - j;
         Diff::new(Mode::Dup(delta))
@@ -248,8 +246,7 @@ fn build_diff(diffs: &[Diff], names_indices: &HashMap<&str, usize>, i: usize, na
             } else if let Some(n) = parse_digits(raw_token) {
                 Some(Token::Digits(n))
             } else if raw_token.len() == 1 {
-                let b = raw_token.as_bytes()[0];
-                Some(Token::Char(b))
+                Some(Token::Char(raw_token[0]))
             } else {
                 Some(Token::String(raw_token.into()))
             }
@@ -266,21 +263,21 @@ fn build_diff(diffs: &[Diff], names_indices: &HashMap<&str, usize>, i: usize, na
     diff
 }
 
-fn parse_digits0(s: &str) -> Option<u32> {
-    if s.starts_with('0') {
-        s.parse().ok()
+fn parse_digits0(s: &[u8]) -> Option<u32> {
+    if s.starts_with(b"0") {
+        parse_u32(s).ok()
     } else {
         None
     }
 }
 
-fn parse_digits(s: &str) -> Option<u32> {
-    s.parse().ok()
+fn parse_digits(s: &[u8]) -> Option<u32> {
+    parse_u32(s).ok()
 }
 
-fn parse_delta(prev_token: &Token, s: &str) -> Option<(u32, u8)> {
+fn parse_delta(prev_token: &Token, s: &[u8]) -> Option<(u32, u8)> {
     if let Token::Digits(n) | Token::Delta(n, _) = prev_token {
-        let m = s.parse().ok()?;
+        let m = parse_u32(s).ok()?;
 
         if m >= *n {
             let delta = m - n;
@@ -294,11 +291,11 @@ fn parse_delta(prev_token: &Token, s: &str) -> Option<(u32, u8)> {
     None
 }
 
-fn parse_delta0(prev_s: &str, prev_token: &Token, s: &str) -> Option<(u32, u8)> {
+fn parse_delta0(prev_s: &[u8], prev_token: &Token, s: &[u8]) -> Option<(u32, u8)> {
     if let Token::PaddedDigits(n, _) | Token::Delta0(n, _) = prev_token
         && s.len() == prev_s.len()
     {
-        let m = s.parse().ok()?;
+        let m = parse_u32(s).ok()?;
 
         if m >= *n {
             let delta = m - n;
@@ -310,6 +307,10 @@ fn parse_delta0(prev_s: &str, prev_token: &Token, s: &str) -> Option<(u32, u8)> 
     }
 
     None
+}
+
+fn parse_u32(src: &[u8]) -> io::Result<u32> {
+    lexical_core::parse(src).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
 }
 
 #[derive(Default)]
@@ -332,7 +333,7 @@ impl TokenWriter {
 
         match token {
             Token::String(s) => {
-                self.string_writer.write_all(s.as_bytes())?;
+                self.string_writer.write_all(s)?;
                 self.string_writer.write_all(&[NUL])?;
             }
             Token::Char(b) => write_u8(&mut self.char_writer, *b)?,
