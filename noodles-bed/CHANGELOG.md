@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+  * bed/io/reader/record: Skip comment lines ([#378]).
+
+[#378]: https://github.com/zaeleus/noodles/issues/378
+
 ## 0.31.0 - 2026-02-18
 
 ### Changed

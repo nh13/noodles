@@ -1,5 +1,7 @@
 use std::io::{self, BufRead};
 
+use memchr::{memchr, memchr2};
+
 use crate::{Record, record::fields::Bounds};
 
 pub(super) fn read_record_3<R>(reader: &mut R, record: &mut Record<3>) -> io::Result<usize>
@@ -13,6 +15,8 @@ where
 
     let bounds = &mut fields.bounds;
     bounds.other_fields_ends.clear();
+
+    skip_comment_lines(reader)?;
 
     let mut len = 0;
 
@@ -44,6 +48,8 @@ where
 
     let bounds = &mut fields.bounds;
     bounds.other_fields_ends.clear();
+
+    skip_comment_lines(reader)?;
 
     let mut len = 0;
 
@@ -78,6 +84,8 @@ where
 
     let bounds = &mut fields.bounds;
     bounds.other_fields_ends.clear();
+
+    skip_comment_lines(reader)?;
 
     let mut len = 0;
 
@@ -116,6 +124,8 @@ where
     let bounds = &mut fields.bounds;
     bounds.other_fields_ends.clear();
 
+    skip_comment_lines(reader)?;
+
     let mut len = 0;
 
     len += read_required_field(reader, dst)?;
@@ -142,6 +152,56 @@ where
     }
 
     Ok(len)
+}
+
+// § 1.3 "Terminology and concepts" (2022-01-05): "**comment line**: A **line** that starts with
+// **#** with no horizontal whitespace beforehand."
+const COMMENT_PREFIX: u8 = b'#';
+
+fn skip_comment_lines<R>(reader: &mut R) -> io::Result<()>
+where
+    R: BufRead,
+{
+    loop {
+        let src = reader.fill_buf()?;
+
+        if src.starts_with(&[COMMENT_PREFIX]) {
+            discard_line(reader)?;
+        } else {
+            break;
+        }
+    }
+
+    Ok(())
+}
+
+fn discard_line<R>(reader: &mut R) -> io::Result<()>
+where
+    R: BufRead,
+{
+    const LINE_FEED: u8 = b'\n';
+
+    let mut is_eol = false;
+
+    while !is_eol {
+        let src = reader.fill_buf()?;
+
+        if src.is_empty() {
+            break;
+        }
+
+        let n = match memchr(LINE_FEED, src) {
+            Some(i) => {
+                is_eol = true;
+                i + 1
+            }
+            None => src.len(),
+        };
+
+        reader.consume(n);
+    }
+
+    Ok(())
 }
 
 fn read_other_fields<R, const N: usize>(
@@ -189,8 +249,6 @@ fn read_field<R>(reader: &mut R, dst: &mut Vec<u8>) -> io::Result<(usize, bool)>
 where
     R: BufRead,
 {
-    use memchr::memchr2;
-
     const DELIMITER: u8 = b'\t';
     const LINE_FEED: u8 = b'\n';
     const CARRIAGE_RETURN: u8 = b'\r';
@@ -245,12 +303,47 @@ mod tests {
         assert_eq!(record.0.buf, b"sq001");
         assert_eq!(record.0.bounds, Bounds::default());
 
+        let mut src = &b"# noodles\nsq0\t0\t1\n"[..];
+        read_record_3(&mut src, &mut record)?;
+        assert_eq!(record.0.buf, b"sq001");
+        assert_eq!(record.0.bounds, Bounds::default());
+
         let mut src = &b"sq0\t0\t1\t.\n"[..];
         read_record_3(&mut src, &mut record)?;
         assert_eq!(record.0.buf, b"sq001.");
         let mut bounds = Bounds::default();
         bounds.other_fields_ends.push(6);
         assert_eq!(record.0.bounds, bounds);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_skip_comment_lines() -> io::Result<()> {
+        let mut src = &b"sq0\t0\t1\n"[..];
+        skip_comment_lines(&mut src)?;
+        assert_eq!(src, &b"sq0\t0\t1\n"[..]);
+
+        let mut src = &b"# noodles\nsq0\t0\t1\n"[..];
+        skip_comment_lines(&mut src)?;
+        assert_eq!(src, &b"sq0\t0\t1\n"[..]);
+
+        let mut src = &b"# noodles\n# bed\nsq0\t0\t1\n"[..];
+        skip_comment_lines(&mut src)?;
+        assert_eq!(src, &b"sq0\t0\t1\n"[..]);
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_discard_line() -> io::Result<()> {
+        let mut src = &b"noo\ndles"[..];
+
+        discard_line(&mut src)?;
+        assert_eq!(src, &b"dles"[..]);
+
+        discard_line(&mut src)?;
+        assert!(src.is_empty());
 
         Ok(())
     }
