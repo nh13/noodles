@@ -44,13 +44,11 @@ where
     W: Write,
     S: Sample,
 {
-    const DELIMITER: &[u8] = b":";
-
     for (i, result) in sample.iter(header).enumerate() {
         let (_, value) = result.map_err(WriteError::Io)?;
 
         if i > 0 {
-            writer.write_all(DELIMITER).map_err(WriteError::Io)?;
+            write_separator(writer)?;
         }
 
         match value {
@@ -60,6 +58,14 @@ where
     }
 
     Ok(())
+}
+
+fn write_separator<W>(writer: &mut W) -> Result<(), WriteError>
+where
+    W: Write,
+{
+    const SEPARATOR: &[u8] = b":";
+    writer.write_all(SEPARATOR).map_err(WriteError::Io)
 }
 
 #[cfg(test)]
