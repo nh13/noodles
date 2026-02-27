@@ -6,6 +6,12 @@
 
   * bed/io/reader/record: Skip comment lines ([#378]).
 
+  * bed/record/other_fields: Return a byte string (`&BStr`) from
+    `OtherFields::get`.
+
+    This previously returned a byte slice (`&[u8]`), and while it's effectively
+    the same, this makes it more convenient to use.
+
 [#378]: https://github.com/zaeleus/noodles/issues/378
 
 ## 0.31.0 - 2026-02-18

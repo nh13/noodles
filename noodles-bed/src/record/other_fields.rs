@@ -1,6 +1,6 @@
 use std::{fmt, iter};
 
-use bstr::{BStr, ByteSlice};
+use bstr::BStr;
 
 use super::Fields;
 use crate::feature::record::other_fields::Value;
@@ -25,7 +25,7 @@ impl<'a, const N: usize> OtherFields<'a, N> {
     }
 
     /// Returns an other field at the given index.
-    pub fn get(&self, i: usize) -> Option<&[u8]> {
+    pub fn get(&self, i: usize) -> Option<&BStr> {
         self.0.get(i)
     }
 
@@ -34,7 +34,7 @@ impl<'a, const N: usize> OtherFields<'a, N> {
         let mut i = 0;
 
         iter::from_fn(move || {
-            let field = self.get(i).map(|buf| buf.as_bstr())?;
+            let field = self.get(i)?;
             i += 1;
             Some(field)
         })

@@ -16,8 +16,8 @@ pub(crate) struct Fields<const N: usize> {
 }
 
 impl<const N: usize> Fields<N> {
-    pub(super) fn get(&self, i: usize) -> Option<&[u8]> {
-        self.bounds.get(i).map(|range| &self.buf[range])
+    pub(super) fn get(&self, i: usize) -> Option<&BStr> {
+        self.bounds.get(i).map(|range| self.buf[range].as_bstr())
     }
 }
 
