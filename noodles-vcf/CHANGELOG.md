@@ -5,9 +5,10 @@
 ### Changed
 
   * vcf/header/record/value/map/format/definition/v4_5: Update local genotype
-    likelihoods (`LGL`) type.
+    likelihoods (`LGL`) and local genotype posterior probabilities (`LGP`)
+    types.
 
-    This was changed from an integer to a float in [samtools/hts-specs#851].
+    These were changed from integers to floats in [samtools/hts-specs#851].
 
 [samtools/hts-specs#851]: https://github.com/samtools/hts-specs/pull/851
 
