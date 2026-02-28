@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+  * vcf/header/record/value/map/format/definition/v4_5: Update local genotype
+    likelihoods (`LGL`) type.
+
+    This was changed from an integer to a float in [samtools/hts-specs#851].
+
+[samtools/hts-specs#851]: https://github.com/samtools/hts-specs/pull/851
+
 ## 0.84.0 - 2026-02-18
 
 ### Changed

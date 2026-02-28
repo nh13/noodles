@@ -77,7 +77,7 @@ pub(super) fn definition(key: &str) -> Option<(Number, Type, &'static str)> {
         )),
         key::LOCAL_GENOTYPE_LIKELIHOODS => Some((
             Number::LocalSamples,
-            Type::Integer,
+            Type::Float,
             "Local-allele representation of GL",
         )),
         key::LOCAL_GENOTYPE_POSTERIOR_PROBABILITIES => Some((
