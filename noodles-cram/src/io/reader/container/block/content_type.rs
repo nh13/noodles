@@ -3,13 +3,10 @@ use std::io;
 use crate::container::block::ContentType;
 
 pub(super) fn read_content_type(src: &mut &[u8]) -> io::Result<ContentType> {
-    let (n, rest) = src
-        .split_first()
-        .ok_or_else(|| io::Error::from(io::ErrorKind::UnexpectedEof))?;
-
-    *src = rest;
-
-    decode(*n)
+    src.split_off_first()
+        .copied()
+        .ok_or_else(|| io::Error::from(io::ErrorKind::UnexpectedEof))
+        .and_then(decode)
 }
 
 pub(crate) fn decode(n: u8) -> io::Result<ContentType> {
